@@ -1,112 +1,112 @@
 #include <iostream>
-#include <string>
-#include <unordered_set>
+#include <vector>
 #include <queue>
 using namespace std;
 
-enum Role {
-    oprator,
-    supervisor,
-    director,
-    unexpected
-};
-
-enum CallState {
-    untaken,
-    inProgress,
-    finished
+enum Rank {
+    respondent = 0,
+    director = 1,
+    manager = 2
 };
 
 class Call {
 public:
-    Role role;
-    int callId;
-    int callTakenEmployeeId;
-    int timestamp;
-    CallState state;
-    Call(){}
-};
+    Rank rank;
+    int caller_id;
+    int handler_id;
 
-class CallCenter {
-public:
-    queue<Call> waitedCalls;
-    unordered_set<Operator> operators;
-    unordered_set<Supervisor> supervisors;
-    unordered_set<Director> directors;
-
-    void dispatchCall(Call& call) {
-        switch (call.role)
-        {
-        case Role::oprator:
-            // find one from oprators, if not exist, escalate this call.
-        case Role::supervisor:
-            // find one from supervisors, if not exist, escalate this call.
-        case Role::director:
-            // find one from directors, if not exist, escalate this call.
-        default:
-            break;
-        }
-    }
-
-    // void dispatchCall(Call& call, Employee& employee){
-    //     if exist, dispatch it, or escalate this call.
-    //}
-
-    void markCallFinished(Call& call) {}
-    void notifyCallEscalated(Call& call) {}
+    void reply(string message) {}
+    void disconnect() {}
 };
 
 class Employee {
 public:
-    int employeeId;
-    string name;
-    Role role;
-    Call currentCall;
-    CallCenter belongedCallCenter;
+    int employee_id;
+    Rank rank;
     bool isBusy;
 
-public:
-    Employee(int id, string _name, Role _role, CallCenter& callCenter) : employeeId(id), name(_name), role(_role), belongedCallCenter(callCenter) {}
-    void takeCall(Call& call) {
-        call.callTakenEmployeeId = employeeId;
-        call.state = CallState::inProgress;
+    void receiveCall(Call& call) {}
+    void disconnect() {}
+    bool isFree() {
+        return !isBusy;
     }
 
-    void finishCall() {
-        currentCall.state = CallState::finished;
-        belongedCallCenter.markCallFinished(currentCall);
+    void escalateCall(Call call) {
+        // escalate this call and request call center to add this call to queue. 
     }
 
-    virtual bool escalateCall() {
-        currentCall.state = untaken;
-        currentCall.callTakenEmployeeId = -1;
-        belongedCallCenter.notifyCallEscalated(currentCall);
+    Rank getRank() {
+        return rank;
     }
 };
 
-class Operator: public Employee{
+class Respondent : public Employee {
 public:
-    Operator(int id, string _name, Role _role, CallCenter& callCenter): Employee(id, _name, _role, callCenter){}
-
-    virtual bool escalateCall() override {
-        currentCall.role = Role::supervisor;
-        Employee::escalateCall();
-    }
-};
-
-class Supervisor: public Employee{
-public:
-    Supervisor(int id, string _name, Role _role, CallCenter& callCenter) : Employee(id, _name, _role, callCenter) {}
-
-    virtual bool escalateCall() override {
-        currentCall.role = Role::director;
-        Employee::escalateCall();
+    Respondent() {
+        rank = Rank::respondent;
     }
 };
 
 class Director : public Employee {
 public:
-    Director(int id, string _name, Role _role, CallCenter& callCenter) : Employee(id, _name, _role, callCenter) {}
+    Director() {
+        rank = Rank::director;
+    }
+};
+
+class Manager : public Employee {
+public:
+    Manager() {
+        rank = Rank::manager;
+    }
+};
+
+class CallCenter {
+private:
+    const int respondent_num = 50;
+    const int director_num = 50;
+    const int manager_num = 50;
+
+    vector<Respondent> respondents;
+    vector<Director> directors;
+    vector<Manager> managers;
+
+    queue<Respondent> wait_for_respondents;
+    queue<Director> wait_for_directors;
+    queue<Manager> wait_for_managers;
+
+    queue<Respondent> free_for_respondents;
+    queue<Director> free_for_directors;
+    queue<Manager> free_for_managers;
+
+    void dispatchCall(Call& call) {
+        Employee* em = getHandlerForCall(call);
+        if (em) {
+            em->receiveCall(call);
+            call.handler_id = em->employee_id;
+        }
+        else {
+            storeCallIntoQueue(call);
+        }
+    }
+
+    Employee* getHandlerForCall(Call& call) {
+        switch (call.rank) {
+        case Rank::respondent:
+            // Try to find one.
+        case Rank::director:
+            // Try to find one.
+        case Rank::manager:
+            // Try to find one.
+        default:
+            break;
+        }
+    }
+
+    bool storeCallIntoQueue(Call& call) {
+    }
+
+    bool assignCall(Call& call, Employee& em) {}
 };
 
 int main() {
