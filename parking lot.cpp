@@ -1,149 +1,280 @@
 #include <iostream>
 #include <vector>
+#include <string>
 using namespace std;
 
-enum VehicleType {
-    motorcycle,
-    car,
-    bus
-};
-
-enum PotType {
-    small,
-    normal,
-    large
+enum SpotSize {
+    Motorcycle,
+    Compact,
+    Large
 };
 
 class Vehicle {
+protected:
+    vector<ParkingSpot> parkingSpots;
+    string licensePlate;
+    SpotSize size;
+    int spotsNeeded;
+
 public:
-    int licesence_plate;
-    VehicleType vehicle_type;
-    vector<PotType> supported_pot_types;
-    ParkingPot* parked_pot;
-
-    virtual bool canFitInSpot(ParkingPot& pot) = 0;
-    void moveInPot(ParkingPot* pot) {
-        parked_pot = pot;
+    int getSpotsNeeded() {
+        return spotsNeeded;
     }
 
-    void moveOutPot() {
-        parked_pot = nullptr;
+    SpotSize getSize() {
+        return size;
     }
+
+    /* Park vehicle in this spot (among others, potentially) */
+    void parkInSpot(ParkingSpot& spot) {
+        parkingSpots.push_back(spot);
+    }
+
+    /* Remove car from spot, and notify spot that it's gone */
+    void clearSpots() {
+        for (int i = 0; i < parkingSpots.size(); i++) {
+            parkingSpots[i].removeVehicle();
+        }
+        parkingSpots.clear();
+    }
+
+    virtual bool canFitInSpot(ParkingSpot spot) = 0;
+    virtual void print() = 0;
 };
 
 class Motorcycle : public Vehicle {
-    bool canFitInSpot(ParkingPot& pot) {
+public:
+    Motorcycle() {
+        spotsNeeded = 1;
+        size = SpotSize::Motorcycle;
+    }
+
+    bool canFitInSpot(ParkingSpot& spot) {
         return true;
     }
-};
 
-class Car :public Vehicle {
-    bool canFitInSpot(ParkingPot& pot) {
-        return pot.pot_type == PotType::normal || pot.pot_type == PotType::large;
+    void print() {
+        cout << "M";
     }
 };
 
-class Bus :public Vehicle {
-    bool canFitInSpot(ParkingPot& pot) {
-        return pot.pot_type == PotType::large;
-    }
-};
-
-class ParkingPot {
+class Car : public Vehicle {
 public:
-    int level;
-    int row;
-    int column;
-    bool empty;
-    PotType pot_type;
-    Vehicle* parked_vehicle;
-
-    bool isAvailable() {
-        return empty;
+    Car() {
+        spotsNeeded = 1;
+        size = SpotSize::Compact;
     }
 
-    bool canFitVehicle(Vehicle& vehicle) {
-        return isAvailable() && vehicle.canFitInSpot(*this);
+    bool canFitInSpot(ParkingSpot& spot) {
+        return spot.getSize() == SpotSize::Large || spot.getSize() == SpotSize::Compact;
     }
 
-    void moveVehicleIn(Vehicle& vehicle) {
-        parked_vehicle = &vehicle;
-        vehicle.moveInPot(this);
-
-        empty = false;
-    }
-
-    void moveVehiclesOut() {
-        parked_vehicle = nullptr;
-        if (parked_vehicle) {
-            parked_vehicle->moveOutPot();
-        }
-
-        empty = true;
+    void print() {
+        cout << "C";
     }
 };
 
-class PotAllocationService {
+class Bus : public Vehicle {
 public:
-    ParkingPot* findAvailablePot(vector<PotType> pots) {
-        for (auto potType : pots) {
-        }
+    Bus() {
+        spotsNeeded = 5;
+        size = SpotSize::Large;
+    }
 
-        return nullptr;
+    bool canFitInSpot(ParkingSpot spot) {
+        return spot.getSize() == SpotSize::Large;
+    }
+
+    void print() {
+        cout << "B";
     }
 };
 
-struct PotPosition {
-    int level;
-    int row;
-    int column;
-};
-
-class Ticket {
-    int time_stamp;
-    VehicleType vehicle_type;
-    int vehicle_template;
-    PotPosition position;
-};
-
-class ParkingLevel {
+/* Represents a level in a parking garage */
+class Level {
 private:
     int floor;
-    PotAllocationService pot_allocation_service;
+    vector<ParkingSpot> spots;
+    int availableSpots = 0; // number of free spots
+    const int SPOTS_PER_ROW = 10;
 
 public:
-    bool try_park_vehicle(Vehicle& vehicle) {
-        ParkingPot* pot = findAvailablePot(vehicle);
-        if (pot == nullptr) {
-            cout << "No available parking pot at level:" << floor << endl;
+    Level() {}
+    Level(int flr, int numberSpots) {
+        floor = flr;
+        spots = vector<ParkingSpot>();
+        int largeSpots = numberSpots / 4;
+        int  compactSpots = numberSpots / 4;
+        int motorcycleSpots = numberSpots - largeSpots - motorcycleSpots;
+        for (int i = 0; i < numberSpots; i++) {
+            SpotSize sz;
+            if (i < largeSpots) {
+                sz = SpotSize::Large;
+            }
+            else if (i < largeSpots + compactSpots) {
+                sz = SpotSize::Compact;
+            }
+            else {
+                sz = SpotSize::Motorcycle;
+            }
 
+            int row = i / SPOTS_PER_ROW;
+            spots.push_back(ParkingSpot(this, row, i, sz));
+        }
+        availableSpots = numberSpots;
+    }
+
+    int availableSpots() {
+        return availableSpots;
+    }
+
+    /* Try to find a place to park this vehicle. Return false if failed. */
+    bool parkVehicle(Vehicle& vehicle) {
+        if (availableSpots < vehicle.getSpotsNeeded()) {
             return false;
         }
-        else {
-            pot->moveVehicleIn(vehicle);
-            printTicket(*pot, vehicle);
 
-            return true;
+        int spotNumber = findAvailableSpots(vehicle);
+        if (spotNumber < 0) {
+            return false;
+        }
+
+        return parkStartingAtSpot(spotNumber, vehicle);
+    }
+
+    void print() {
+        int lastRow = -1;
+        for (int i = 0; i < spots.size(); i++) {
+            ParkingSpot spot = spots[i];
+            if (spot.getRow() != lastRow) {
+                cout << "  ";
+                lastRow = spot.getRow();
+            }
+            spot.print();
         }
     }
 
-    ParkingPot* findAvailablePot(Vehicle& vehicle) {
-        return pot_allocation_service.findAvailablePot(vehicle.supported_pot_types);
+    /* When a car was removed from the spot, increment availableSpots */
+    void spotFreed() {
+        availableSpots++;
     }
 
-    Ticket printTicket(ParkingPot& pot, Vehicle& vehicle) {
+private:
+    /* Park a vehicle starting at the spot spotNumber, and continuing until vehicle.spotsNeeded. */
+    bool parkStartingAtSpot(int spotNumber, Vehicle& vehicle) {
+        vehicle.clearSpots();
+        bool success = true;
+        for (int i = spotNumber; i < spotNumber + vehicle.getSpotsNeeded(); i++) {
+            success &= spots[i].park(&vehicle);
+        }
+
+        availableSpots -= vehicle.getSpotsNeeded();
+
+        return success;
+    }
+
+    /* find a spot to park this vehicle. Return index of spot, or -1 on failure. */
+    int findAvailableSpots(Vehicle& vehicle) {
+        int spotsNeeded = vehicle.getSpotsNeeded();
+        int previousRow = -1;
+        int spotsFound = 0;
+        for (int i = 0; i < spots.size(); i++) {
+            ParkingSpot spot = spots[i];
+            // if current row and previous row are not the same row, set spotsFound to zero. 
+            // Because we could not park a vehicle in two rows.
+            if (previousRow != spot.getRow()) {
+                spotsFound = 0;
+                previousRow = spot.getRow();
+            }
+
+            // if current pot is not suitable for vehicle, we will reset spotsFound to zero.
+            // Because we could not found a contious region to park this vehicle.
+            if (spot.canFitVehicle(&vehicle)) {
+                spotsFound++;
+            }
+            else {
+                spotsFound = 0;
+            }
+
+            if (spotsFound == spotsNeeded) {
+                return i - (spotsNeeded - 1);
+            }
+        }
+
+        return -1;
     }
 };
 
-class ParkingLot {
+class ParkingSpot {
 private:
-    vector<ParkingLevel> levels;
+    Vehicle* vehicle;
+    SpotSize spotSize;
+    int row;
+    int spotNumber;
+    Level* level;
 
 public:
-    void try_park_vehicle(Vehicle& vehicle) {
-        for (auto& level : levels) {
-            if (level.try_park_vehicle(vehicle))
-                return;
+    ParkingSpot(Level* lvl, int r, int n, SpotSize sz) {
+        level = lvl;
+        row = r;
+        spotNumber = n;
+        spotSize = sz;
+    }
+
+    bool isAvailable() {
+        return vehicle == nullptr;
+    }
+
+    /* Checks if the spot is big enough for the vehicle (and is available). This compares
+    * the SIZE only. It does not check if it has enough spots. */
+    bool canFitVehicle(Vehicle* vehicle) {
+        return isAvailable() && vehicle->canFitInSpot(*this);
+    }
+
+    /* Park vehicle in this spot. */
+    bool park(Vehicle* v) {
+        if (!canFitVehicle(v)) {
+            return false;
+        }
+
+        vehicle = v;
+        vehicle->parkInSpot(*this);
+        return true;
+    }
+
+    int getRow() {
+        return row;
+    }
+
+    int getSpotNumber() {
+        return spotNumber;
+    }
+
+    SpotSize getSize() {
+        return spotSize;
+    }
+
+    /* Remove vehicle from spot, and notify level that a new spot is available */
+    void removeVehicle() {
+        level->spotFreed();
+        vehicle = nullptr;
+    }
+
+    void print() {
+        if (vehicle == nullptr) {
+            switch (spotSize) {
+            case SpotSize::Motorcycle:
+                cout << "m" << endl;
+            case SpotSize::Compact:
+                cout << "c" << endl;
+            case SpotSize::Large:
+                cout << "l" << endl;
+            default:
+                break;
+            }
+        }
+        else {
+            vehicle->print();
         }
     }
 };
