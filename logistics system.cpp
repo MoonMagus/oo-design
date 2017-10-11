@@ -3,6 +3,18 @@
 #include <vector>
 using namespace std;
 
+// Use case:
+// 1. A client could submit a order to get his items delivered to a given destination.
+// 2. User could track staus of order.
+
+// Classes design.
+// 1. client.
+// 2. order.
+// 3. item
+// 4. vehicle. which extended by motorcycle, car or trunk.
+// 5. location. E.g. longtitude, gratitude.
+// 6. admin
+
 enum VehicleStatus {
     free,
     busy,
@@ -18,7 +30,7 @@ enum OrderStatus {
 enum PaymentStatus {
     paid,
     unpaid
-};  
+};
 
 enum OrderPriority {
     low,
@@ -26,28 +38,25 @@ enum OrderPriority {
     high
 };
 
-// for geographical position of any point
+// For geographical position of any point
 class Location {
     float longitude;
     float latitude;
 };
 
-// for the vehicles used for transportation
-class Vehicle {
-    int id;
-    string vehicleNo;
-    int capacity;
-    Location current_position;
-    VehicleStatus current_condition;
+// Desciption: client which could afford client use cases.
+// Layer: Client side, Data layer(Related database table).
+//        # Client side metadata is retrived from Data layer. 
+//        # Related object are assembled or functions are implemented at client side to interact with service API layer.
+class Client {
+    int client_id;
+    string name;
+    Location adress;
 };
 
-class Truck : public Vehicle {
-};
-
-class Bike : public Vehicle {
-};
-
-// a new order is created for each order place by any client
+// Layer: Client side, Data layer. 
+// Layer: Client side, Data layer(Related database table).
+//        # Related object are assembled or functions are implemented at client side to interact with service API layer.
 class Order {
     int order_id;
     OrderPriority priority_of_order;
@@ -62,7 +71,26 @@ class Order {
     int time_of_delivery;
 };
 
-// An order is List of Items
+// Layer: Client side, Data layer. 
+// Layer: Client side, Data layer(Related database table).
+//        # Related object are assembled or functions are implemented at client side to interact with service API layer.
+class Vehicle {
+    int id;
+    string vehicleNo;
+    int capacity;
+    Location current_position;
+    VehicleStatus current_condition;
+};
+
+class Truck : public Vehicle {
+};
+
+class Bike : public Vehicle {
+};
+
+// Layer: Client side, Data layer. 
+// Layer: Client side, Data layer(Related database table).
+//        # Related object are assembled or functions are implemented at client side to interact with service API layer.
 class Item {
     int itemId;
     string name;
@@ -71,15 +99,15 @@ class Item {
     int weight;
 };
 
-class Client {
-    int client_id;
-    string name;
-    Location adress;
-};
-
+// Layer: Web service layer.
 class Admin {
 public:
+    // Take order from client side.
     void take_order(Order order) {}
+
+    // Process order at service layer and dispatch vehicles.
     void process_order(Order order) {}
+
+    // Retrieve data from DB and sent status to client side.
     Location track_order(int order_id) {}
 };
